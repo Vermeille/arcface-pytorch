@@ -35,7 +35,7 @@ class ArcMarginProduct(nn.Module):
     def forward(self, input, label):
         # --------------------------- cos(theta) & phi(theta) ---------------------------
         cosine = F.linear(F.normalize(input), F.normalize(self.weight))
-        sine = torch.sqrt(1.0 - torch.pow(cosine, 2))
+        sine = torch.sqrt(1.0 - torch.pow(cosine, 2) + 1e-6)
         phi = cosine * self.cos_m - sine * self.sin_m
         if self.easy_margin:
             phi = torch.where(cosine > 0, phi, cosine)
@@ -46,11 +46,10 @@ class ArcMarginProduct(nn.Module):
         one_hot = torch.zeros(cosine.size(), device='cuda')
         one_hot.scatter_(1, label.view(-1, 1).long(), 1)
         # -------------torch.where(out_i = {x_i if condition_i else y_i) -------------
-        output = (one_hot * phi) + ((1.0 - one_hot) * cosine)  # you can use torch.where if your torch.__version__ is 0.4
+        output = torch.where(one_hot.byte(), phi, cosine)
         output *= self.s
-        # print(output)
 
-        return output
+        return output, cosine
 
 
 class AddMarginProduct(nn.Module):
@@ -77,15 +76,15 @@ class AddMarginProduct(nn.Module):
         cosine = F.linear(F.normalize(input), F.normalize(self.weight))
         phi = cosine - self.m
         # --------------------------- convert label to one-hot ---------------------------
-        one_hot = torch.zeros(cosine.size(), device='cuda')
+        one_hot = torch.zeros(cosine.size(), device=cosine.device)
         # one_hot = one_hot.cuda() if cosine.is_cuda else one_hot
         one_hot.scatter_(1, label.view(-1, 1).long(), 1)
         # -------------torch.where(out_i = {x_i if condition_i else y_i) -------------
-        output = (one_hot * phi) + ((1.0 - one_hot) * cosine)  # you can use torch.where if your torch.__version__ is 0.4
+        output = torch.where(one_hot, phi, cosine)
         output *= self.s
         # print(output)
 
-        return output
+        return output, cosine
 
     def __repr__(self):
         return self.__class__.__name__ + '(' \
@@ -149,10 +148,20 @@ class SphereProduct(nn.Module):
         output = (one_hot * (phi_theta - cos_theta) / (1 + self.lamb)) + cos_theta
         output *= NormOfFeature.view(-1, 1)
 
-        return output
+        return output, cos_theta
 
     def __repr__(self):
         return self.__class__.__name__ + '(' \
                + 'in_features=' + str(self.in_features) \
                + ', out_features=' + str(self.out_features) \
                + ', m=' + str(self.m) + ')'
+
+
+class NoMetric(nn.Module):
+    def __init__(self, dim, num_classes):
+        super(NoMetric, self).__init__()
+        self.linear = nn.Linear(dim, num_classes)
+
+    def forward(self, x):
+        x = self.linear(x)
+        return x, x

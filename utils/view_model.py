@@ -2,6 +2,7 @@ import torch
 from torch.autograd import Variable
 import torch.nn as nn
 from graphviz import Digraph
+from io import BytesIO
 
 
 __all__ = ['view_model']
@@ -84,7 +85,7 @@ def view_model(net, input_shape):
     x = Variable(torch.randn(1, *input_shape))
     y = net(x)
     g = make_dot(y)
-    g.view()
+    g.render()
 
     params = list(net.parameters())
     k = 0

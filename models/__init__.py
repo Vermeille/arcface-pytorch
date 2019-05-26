@@ -1,3 +1,4 @@
-from resnet import *
-from metrics import *
-from focal_loss import *
+from models.adversarial import *
+from models.resnet import *
+from models.metrics import *
+from models.focal_loss import *
