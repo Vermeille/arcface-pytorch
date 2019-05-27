@@ -1,0 +1,48 @@
+session_name: face rec
+device: cuda
+datasets:
+    - name: images
+      location: ../preprocessed_64/
+      size: 64
+
+    - name: imdb
+      location: ../data/
+      size: 64
+
+tester:
+    name: lfw
+    root: ../lfw_funneled/
+    pairs_file: ./lfw_test_pair.txt
+    batch_size: 64
+    similarity: cosine
+
+trainer:
+    batch_size: 64
+    num_worker: 32
+    max_epoch: 50
+    save_interval: 2000
+    test_interval: 1000
+    iter_n: 0
+    display: True
+    print_freq: 10
+    num_workers: 32
+
+optimizer:
+    name: SGD
+    lr: 0.001
+    momentum: 0.9
+
+loss:
+    name: cross_entropy
+    balance: True
+
+model:
+    name: resnet_face50
+    use_se: False
+
+metric:
+    name: ArcMarginProduct
+    dim: 512
+
+scheduler:
+    name: NoSched

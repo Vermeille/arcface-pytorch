@@ -83,4 +83,5 @@ class Checkpointer:
         for k, v in more_stuff_to_save:
             override_with_path(new_dict, k, v)
         new_dict['trainer']['iter_n'] = iter_n
-        torch.save(new_dict, "{}_{}.pth".format(self.name, iter_n))
+        torch.save(new_dict, "ckpt/{}_{}.pth".format(self.name, self.name,
+                                                   iter_n))

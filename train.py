@@ -20,9 +20,21 @@ from utils import Visualizer, view_model
 from models import *
 from test import get_tester
 import models.loader as loader
+import training.scheduling as scheduling
+
+
+def report(imgs, pred):
+    html = []
+    for img, p in zip(imgs, pred):
+        print(pred.shape, p.shape)
+        html.append(
+            visualizer.img2html(img) + '<br/>' + str(p.item()) + '<br/>')
+        visualizer.html(''.join(html), win='report', opts=dict(title='report'))
+
 
 if __name__ == '__main__':
     opt = configurator.from_cmdline()
+    trainopts = opt['trainer']
     if opt.get('session_name', False):
         visualizer = Visualizer(env=opt['session_name'])
     device = torch.device(opt['device'])
@@ -50,42 +62,27 @@ if __name__ == '__main__':
         itertools.chain(model.parameters(), metric_fc.parameters()),
         opt['optimizer'])
 
+    sched = scheduling.get_scheduler(optimizer, opt['scheduler'],
+                                     trainopts.get('iter_n', 0))
+
     #view_model(model, train_dataset[0])
     ckpt = configurator.Checkpointer(model, metric_fc, optimizer,
                                      opt['session_name'], opt)
     model.to(device)
     metric_fc.to(device)
-    #adv = Adversarial(visualizer).cuda()
 
-    trainopts = opt['trainer']
     trainloader = data.DataLoader(train_dataset,
                                   pin_memory=True,
                                   batch_size=trainopts['batch_size'],
                                   shuffle=True,
                                   num_workers=trainopts['num_workers'])
 
-    def sched(iter_n, optimizer):
-        the_lr = opt.lr[-1][1]
-        the_mom = opt.lr[-1][2]
-        for (limit_lo, lr_lo,
-             mom_lo), (lim_hi, lr_hi, mom_hi) in zip(opt.lr[:-1], opt.lr[1:]):
-            if limit_lo <= iter_n < lim_hi:
-                t = utils.maths.get_t(limit_lo, lim_hi, iter_n)
-                the_lr = utils.maths.lerp(lr_lo, lr_hi, t)
-                the_mom = utils.maths.lerp(mom_lo, mom_hi, t)
-
-        for group in optimizer.param_groups:
-            group['lr'] = the_lr
-            group['momentum'] = the_mom
-
-    #scheduler = torch.optim.lr_scheduler.CyclicLR(optimizer, 0.01, 6, len(trainloader) * 5, cycle_momentum=True, mode='triangular')
-
     iters = trainopts.get('iter_n', 0)
     start = time.time()
     for i in range(trainopts.get('start_epoch', 0), trainopts['max_epoch']):
         tot_loss = 0
         for ii, batch in enumerate(trainloader):
-            data_input, label  = batch
+            data_input, label = batch
             data_input = data_input.to(device, non_blocking=True)  #.half()
             label = label.to(device, non_blocking=True).long()
 
@@ -95,14 +92,13 @@ if __name__ == '__main__':
             loss.backward()
             tot_loss += loss.item()
             if ii % trainopts.get('n_accumulations', 1) == 0:
-                optimizer.step()
-                #scheduler.step(loss.item())
-                #sched(iters, optimizer)
+                sched.step(loss.item())
                 optimizer.zero_grad()
 
-            if iters % trainopts['print_freq', 10] == 0:
+            if iters % trainopts['print_freq'] == 0:
                 cosine = cosine.data.cpu().numpy()
                 output_label = np.argmax(cosine, axis=1)
+                report(batch[0] * 0.5 + 0.5, cosine[range(cosine.shape[0]), batch[1]])
                 label = label.data.cpu().numpy()
                 acc = np.sum((output_label == label).astype(int))
                 speed = trainopts['print_freq'] / (time.time() - start)
