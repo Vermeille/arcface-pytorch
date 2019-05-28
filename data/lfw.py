@@ -108,7 +108,8 @@ class LFWTester:
             labels.append(label)
 
         loss = torch.nn.functional.binary_cross_entropy(
-            torch.FloatTensor(sims) * 0.5 + 0.5, torch.FloatTensor(labels))
+            torch.clamp(torch.FloatTensor(sims) * 0.5 + 0.5, 0, 1),
+            torch.FloatTensor(labels))
         acc, th = LFWTester.cal_accuracy(sims, labels)
         return acc, th, loss
 

@@ -14,7 +14,7 @@ from PIL import Image
 
 class Visualizer(object):
     def __init__(self, env='default', **kwargs):
-        self.vis = visdom.Visdom(port='8097', env=env, **kwargs)
+        self.vis = visdom.Visdom(env=env, **kwargs)
         self.vis.close()
 
         self.iters = {}

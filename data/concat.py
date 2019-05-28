@@ -5,7 +5,7 @@ class CatedSamples:
     def __init__(self, samples):
         self.samples = samples
         self.n_classes = [
-            len(set(samp[1] for samp in sample)) for sample in samples
+                len(set(samp[1] for samp in sample)) for sample in samples
         ]
 
     def __len__(self):
@@ -26,7 +26,7 @@ class CatedLists:
         self.ls = ls
 
     def __len__(self):
-        return sum(len(ds) for ds in self.ls)
+        return sum([len(ds) for ds in self.ls])
 
     def __getitem__(self, i):
         for l in self.ls:
@@ -42,7 +42,7 @@ class DatasetConcat(torch.utils.data.Dataset):
 
         self.classes = CatedLists([ds.classes for ds in datasets])
         self.imgs = CatedSamples([ds.imgs for ds in datasets])
-        self.class_to_idx = {i: nm for i, nm in enumerate(self.classes)}
+        self.class_to_idx = {nm: i for i, nm in enumerate(self.classes)}
 
     def __len__(self):
         return len(self.imgs)
@@ -56,3 +56,6 @@ class DatasetConcat(torch.utils.data.Dataset):
             i -= len(ds)
             class_offset += len(ds.classes)
         raise IndexError
+
+    def __repr__(self):
+        return "DatasetConcat(" + ", ".join([repr(d) for d in self.datasets]) + ")"

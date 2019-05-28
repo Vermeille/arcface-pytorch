@@ -21,7 +21,7 @@ class IMDBFace(data.Dataset):
         self.imgs = imgs
 
     def get_label(self, p):
-        p = p.split('/')[1]
+        p = p.split('/')[-2]
         try:
             idx = self.class_to_idx[p]
         except:
@@ -53,7 +53,7 @@ class IMDBFace(data.Dataset):
         if self.transforms is not None:
             data = self.transforms(data)
 
-        label = np.int32(splits[-1])
+        label = int(splits[-1])
         return data, label
 
     def __getitem__(self, index):
@@ -66,3 +66,11 @@ class IMDBFace(data.Dataset):
 
     def __len__(self):
         return len(self.imgs)
+
+    def __repr__(self):
+        return """
+    IMDBFace(
+        num_classes: {}
+        num_samples: {}
+        transforms: {}
+    )""".format(len(self.classes), len(self.imgs), self.transforms)

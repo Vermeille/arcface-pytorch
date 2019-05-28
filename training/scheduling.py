@@ -2,7 +2,7 @@ import copy
 
 from torch.optim.lr_scheduler import *
 
-from utils import *
+import utils.maths
 
 
 class CurriculumScheduler:
@@ -11,7 +11,7 @@ class CurriculumScheduler:
         self.schedule = schedule
         self.last_iter = last_iter
 
-    def step(self):
+    def step(self, *unused):
         self.last_iter += 1
         the_lr = self.schedule[-1][1]
         the_mom = self.schedule[-1][2]
@@ -28,6 +28,9 @@ class CurriculumScheduler:
             group['lr'] = the_lr
             group['momentum'] = the_mom
 
+
+    def __repr__(self):
+        return "CurriculumScheduler({})".format(self.schedule)
 
 class NoSched:
     def __init__(self, optimizer, last_iter):

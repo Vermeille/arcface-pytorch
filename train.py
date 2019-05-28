@@ -23,12 +23,58 @@ import models.loader as loader
 import training.scheduling as scheduling
 
 
-def report(imgs, pred):
-    html = []
-    for img, p in zip(imgs, pred):
-        print(pred.shape, p.shape)
-        html.append(
-            visualizer.img2html(img) + '<br/>' + str(p.item()) + '<br/>')
+class Inspector:
+    def __init__(self, topk, labels, center_value=0):
+        self.labels = labels
+        self.center_value = center_value
+        self.topk = topk
+        self.reset()
+
+    def reset(self):
+        self.best = []
+        self.worst = []
+        self.confused = []
+
+    def analyze(self, batch, pred, true):
+        for_label = pred[range(batch.shape[0]), true]
+        this_data = list(zip(batch, for_label, true))
+
+        self.best += this_data
+        self.best.sort(key=lambda x: -x[1])
+        self.best = self.best[:self.topk]
+
+        self.worst += this_data
+        self.worst.sort(key=lambda x: x[1])
+        self.worst = self.worst[:self.topk]
+
+        self.confused += this_data
+        self.confused.sort(key=lambda x: abs(self.center_value - x[1]))
+        self.confused = self.confused[:self.topk]
+
+    def _report(self, dat):
+        def cos_as_bar(cos):
+            return '<div style="width:{}%;background-color:{};height:5px"></div>'.format(
+                abs(cos) * 100, "green" if cos >= 0 else "red")
+
+        html = ['<div style="display:flex;flex-wrap:wrap">']
+        for img, p, cls in dat:
+            img -= img.min()
+            img /= img.max()
+            html.append(
+                '<div style="padding:3px;width:{}px">{}{}{}</div>'.format(
+                    dat[0][0].shape[2], visualizer.img2html(img),
+                    cos_as_bar(p.item()),
+                    self.labels[cls.item()].replace('_', ' ').replace('-', ' ')))
+        html.append('</div>')
+        return ''.join(html)
+
+    def show(self, visualizer):
+        html = [
+            '<h1>Best predictions</h1>',
+            self._report(self.best), '<h1>Worst predictions</h1>',
+            self._report(self.worst), '<h1>Confusions</h1>',
+            self._report(self.confused)
+        ]
         visualizer.html(''.join(html), win='report', opts=dict(title='report'))
 
 
@@ -36,10 +82,12 @@ if __name__ == '__main__':
     opt = configurator.from_cmdline()
     trainopts = opt['trainer']
     if opt.get('session_name', False):
-        visualizer = Visualizer(env=opt['session_name'])
+        visualizer = Visualizer(env=opt['session_name'],
+                                port=opt['visdom_port'])
     device = torch.device(opt['device'])
 
     train_dataset = dataset.get_datasets(opt['datasets'])
+    print(train_dataset)
     count_per_class = dataset.count_per_class(train_dataset).to(device)
     tester = get_tester(opt['tester']['name'], opt['device'], opt['tester'])
     state = {
@@ -65,7 +113,6 @@ if __name__ == '__main__':
     sched = scheduling.get_scheduler(optimizer, opt['scheduler'],
                                      trainopts.get('iter_n', 0))
 
-    #view_model(model, train_dataset[0])
     ckpt = configurator.Checkpointer(model, metric_fc, optimizer,
                                      opt['session_name'], opt)
     model.to(device)
@@ -77,28 +124,38 @@ if __name__ == '__main__':
                                   shuffle=True,
                                   num_workers=trainopts['num_workers'])
 
+    inspector = Inspector(16, train_dataset.classes)
     iters = trainopts.get('iter_n', 0)
     start = time.time()
     for i in range(trainopts.get('start_epoch', 0), trainopts['max_epoch']):
         tot_loss = 0
+        inspector.reset()
         for ii, batch in enumerate(trainloader):
+            model.train()
             data_input, label = batch
             data_input = data_input.to(device, non_blocking=True)  #.half()
             label = label.to(device, non_blocking=True).long()
 
             feature = model(data_input)
             output, cosine = metric_fc(feature, label)
+            cosine = cosine.data.cpu().numpy()
+            inspector.analyze(batch[0], cosine, batch[1])
             loss = criterion(output, label)
             loss.backward()
             tot_loss += loss.item()
             if ii % trainopts.get('n_accumulations', 1) == 0:
+                if trainopts.get('clip_grad', False) != False:
+                    norm = torch.nn.utils.clip_grad.clip_grad_norm_(
+                        itertools.chain(model.parameters(),
+                                        metric_fc.parameters()),
+                        trainopts['clip_grad'])
+                print('param norm:', norm)
+                optimizer.step()
                 sched.step(loss.item())
                 optimizer.zero_grad()
 
             if iters % trainopts['print_freq'] == 0:
-                cosine = cosine.data.cpu().numpy()
                 output_label = np.argmax(cosine, axis=1)
-                report(batch[0] * 0.5 + 0.5, cosine[range(cosine.shape[0]), batch[1]])
                 label = label.data.cpu().numpy()
                 acc = np.sum((output_label == label).astype(int))
                 speed = trainopts['print_freq'] / (time.time() - start)
@@ -122,6 +179,7 @@ if __name__ == '__main__':
                         name='learning_rate',
                         smooth=0)
                     visualizer.images(data_input[:16] * 0.5 + 0.5)
+                    inspector.show(visualizer)
 
                 start = time.time()
 
@@ -139,5 +197,4 @@ if __name__ == '__main__':
                     visualizer.display_current_results(iters,
                                                        test_loss,
                                                        name='test_loss')
-                model.train()
             iters += 1
