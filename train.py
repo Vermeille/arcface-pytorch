@@ -22,6 +22,9 @@ from test import get_tester
 import models.loader as loader
 import training.scheduling as scheduling
 
+def ortho(w, strength=1e-4):
+    return strength * (torch.mm(w, w.t()) * (1 - torch.eye(w.shape[0],
+        device=w.device))).pow(2).mean()
 
 class Inspector:
     def __init__(self, topk, labels, center_value=0):
@@ -35,9 +38,11 @@ class Inspector:
         self.worst = []
         self.confused = []
 
-    def analyze(self, batch, pred, true):
+    def analyze(self, batch, pred, true, pred_label=None):
         for_label = pred[range(batch.shape[0]), true]
-        this_data = list(zip(batch, for_label, true))
+        if pred_label is None:
+            pred_label = pred.argmax(dim=1)
+        this_data = list(zip(batch, for_label, true, pred_label == true))
 
         self.best += this_data
         self.best.sort(key=lambda x: -x[1])
@@ -57,13 +62,14 @@ class Inspector:
                 abs(cos) * 100, "green" if cos >= 0 else "red")
 
         html = ['<div style="display:flex;flex-wrap:wrap">']
-        for img, p, cls in dat:
+        for img, p, cls, correct in dat:
             img -= img.min()
             img /= img.max()
             html.append(
-                '<div style="padding:3px;width:{}px">{}{}{}</div>'.format(
+                    '<div style="padding:3px;width:{}px">{}{}{}{}</div>'.format(
                     dat[0][0].shape[2], visualizer.img2html(img),
                     cos_as_bar(p.item()),
+                    '✓' if correct.item() else '✗',
                     self.labels[cls.item()].replace('_', ' ').replace('-', ' ')))
         html.append('</div>')
         return ''.join(html)
@@ -84,12 +90,15 @@ if __name__ == '__main__':
     if opt.get('session_name', False):
         visualizer = Visualizer(env=opt['session_name'],
                                 port=opt['visdom_port'])
+        if 'visualizer_data' in opt:
+            visualizer.load_state_dict(opt['visualizer_data'])
     device = torch.device(opt['device'])
 
     train_dataset = dataset.get_datasets(opt['datasets'])
     print(train_dataset)
     count_per_class = dataset.count_per_class(train_dataset).to(device)
     tester = get_tester(opt['tester']['name'], opt['device'], opt['tester'])
+    tester.viz = visualizer
     state = {
         'train_dataset': train_dataset,
         'device': device,
@@ -132,47 +141,53 @@ if __name__ == '__main__':
         inspector.reset()
         for ii, batch in enumerate(trainloader):
             model.train()
-            data_input, label = batch
-            data_input = data_input.to(device, non_blocking=True)  #.half()
-            label = label.to(device, non_blocking=True).long()
+            data_input_cpu, label_cpu = batch
+            data_input = data_input_cpu.to(device, non_blocking=True)  #.half()
+            label = label_cpu.to(device, non_blocking=True).long()
 
             feature = model(data_input)
             output, cosine = metric_fc(feature, label)
-            cosine = cosine.data.cpu().numpy()
-            inspector.analyze(batch[0], cosine, batch[1])
-            loss = criterion(output, label)
+            cosine = cosine.detach().to('cpu', non_blocking=True)
+            clf_loss = criterion(output, label)
+            output_label = torch.argmax(cosine, dim=1)
+            inspector.analyze(data_input_cpu, cosine, label_cpu, output_label)
+
+            #ortho_loss = ortho(metric_fc.weight[label, :], 0.001)
+            ortho_loss = ortho(feature, 1e-5)
+            loss = clf_loss + ortho_loss
             loss.backward()
+
             tot_loss += loss.item()
-            if ii % trainopts.get('n_accumulations', 1) == 0:
+            sched.step(loss.item())
+            if iters % trainopts.get('n_accumulations', 1) == 0:
                 if trainopts.get('clip_grad', False) != False:
                     norm = torch.nn.utils.clip_grad.clip_grad_norm_(
                         itertools.chain(model.parameters(),
                                         metric_fc.parameters()),
                         trainopts['clip_grad'])
-                print('param norm:', norm)
+                    print('param norm:', norm)
                 optimizer.step()
-                sched.step(loss.item())
                 optimizer.zero_grad()
 
             if iters % trainopts['print_freq'] == 0:
-                output_label = np.argmax(cosine, axis=1)
-                label = label.data.cpu().numpy()
-                acc = np.sum((output_label == label).astype(int))
+                visualizer.hist(feature.std(dim=0).detach().cpu(), 'feature distribution during train')
+                acc = torch.sum((output_label == label_cpu).int()).item()
                 speed = trainopts['print_freq'] / (time.time() - start)
                 time_str = time.asctime(time.localtime(time.time()))
-                print(
-                    '{} train epoch {} iter {} / {}, {} iters/s loss {} acc {}'
-                    .format(time_str, i, ii, len(trainloader), speed,
-                            loss.item(), acc))
+                print( '{} train epoch {} iter {} / {}, {} iters/s loss {} acc {}' .format(time_str, i, ii, len(trainloader), speed, loss.item(), acc))
                 if trainopts['display']:
                     visualizer.display_current_results(iters,
-                                                       loss.item(),
+                                                       ortho_loss.item(),
+                                                       name='ortho_loss')
+                    visualizer.display_current_results(iters,
+                                                       clf_loss.item(),
                                                        name='train_loss')
                     visualizer.display_current_results(iters,
                                                        acc,
                                                        name='train_acc')
-                    visualizer.hist(cosine[range(cosine.shape[0]), label],
+                    visualizer.hist(cosine[range(cosine.shape[0]), label_cpu],
                                     name='confidence out for good')
+                    visualizer.hist(cosine, name='cosines')
                     visualizer.display_current_results(
                         iters,
                         optimizer.param_groups[0]['lr'],
@@ -185,10 +200,9 @@ if __name__ == '__main__':
 
             if iters % trainopts['save_interval'] == 0:
                 print('SAVING MODEL')
-                ckpt.save(ii)
+                ckpt.save(iters, {'visualizer_data': visualizer.state_dict()})
 
             if iters % trainopts['test_interval'] == 0:
-                model.eval()
                 acc, test_loss = tester(model)
                 if trainopts['display']:
                     visualizer.display_current_results(iters,

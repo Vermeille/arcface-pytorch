@@ -14,28 +14,27 @@ tester:
     name: lfw
     root: ../lfw_funneled/
     pairs_file: ./lfw_test_pair.txt
-    batch_size: 64
+    batch_size: 128
     similarity: cosine
 
 trainer:
-    batch_size: 128
+    batch_size: 256
     num_worker: 32
     max_epoch: 50
     save_interval: 2000
-    test_interval: 1000
+    test_interval: 500
     iter_n: 0
     display: True
     print_freq: 10
     num_workers: 32
-    clip_grad: 5
+    clip_grad: 15
+    n_accumulations: 1
 
 optimizer:
     name: SGD
-    lr: 0.1
-    momentum: 0.9
+    lr: 0.005
     weight_decay: 1.e-6
-    #dampening: 0.1
-    nesterov: True
+    momentum: 0.95
 
 loss:
     name: cross_entropy
@@ -48,11 +47,7 @@ model:
 metric:
     name: ArcMarginProduct
     dim: 512
+    s: 64
 
 scheduler:
-    name: CurriculumScheduler
-    schedule:
-        - [0, 0.01, 0.9]
-        - [40000, 5, 0.7]
-        - [80000, 0.01, 0.9]
-        - [100000, 0.0001, 0.98]
+    name: NoSched

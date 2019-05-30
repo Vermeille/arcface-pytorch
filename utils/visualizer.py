@@ -20,6 +20,13 @@ class Visualizer(object):
         self.iters = {}
         self.lines = {}
 
+    def state_dict(self):
+        return {'iters': self.iters, 'lines': self.lines}
+
+    def load_state_dict(self, loaded):
+        self.iters = loaded['iters']
+        self.lines = loaded['lines']
+
     def display_current_results(self, iters, x, name='train_loss', smooth=0.9):
         if name not in self.iters:
             self.iters[name] = []
@@ -54,7 +61,8 @@ class Visualizer(object):
                         opts={'title': 'test images'})
 
     def hist(self, dat, name):
-        self.vis.histogram(dat.reshape(1, -1), win=name, opts=dict(numbins=50))
+        self.vis.histogram(dat.reshape(1, -1), win=name, opts=dict(numbins=50,
+            title=name))
 
     def display_roc(self, y_true, y_pred):
         fpr, tpr, ths = roc_curve(y_true, y_pred)
@@ -101,3 +109,4 @@ class Visualizer(object):
 
     def html(self, html, **kwargs):
         self.vis.text(html, **kwargs)
+

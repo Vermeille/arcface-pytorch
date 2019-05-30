@@ -74,19 +74,25 @@ class IRBlock(nn.Module):
         self.prelu = nn.ReLU()
         self.prelu3 = nn.ReLU()
         self.prelu2 = nn.ReLU()
-        self.conv2 = conv3x3(inplanes, planes, stride)
+        self.conv2 = conv3x3(inplanes, planes, 1)
         self.bn2 = nn.BatchNorm2d(inplanes)
         self.downsample = downsample
         self.stride = stride
         self.use_se = use_se
         if self.use_se:
             self.se = SEBlock(planes)
+        self.mul = 1
 
     def forward(self, x):
         #print(x.shape)
+
+        if self.downsample is not None:
+            x = self.downsample(x)
         residual = x
+
         out = self.bn0(x)
         out = self.prelu(out)
+
         out = self.conv1(out)
         #out = self.bn1(out)
 
@@ -96,13 +102,10 @@ class IRBlock(nn.Module):
         if self.use_se:
             out = self.se(out)
 
-        if self.downsample is not None:
-            residual = self.downsample(x)
 
-        out += residual
         #out = self.prelu3(out)
 
-        return out
+        return residual + self.mul * out
 
 
 class Bottleneck(nn.Module):
@@ -166,12 +169,14 @@ class ResNetFace(nn.Module):
     def __init__(self, block, layers, use_se=True):
         super(ResNetFace, self).__init__()
         self.inplanes = 64
+        self.L = 1
+        self.base = 0.1
         self.use_se = use_se
         self.conv1 = nn.Conv2d(3, 64, kernel_size=3, padding=1, bias=True)
         self.bn1 = nn.BatchNorm2d(64)
-        self.prelu = nn.PReLU()
-        #self.maxpool = nn.MaxPool2d(kernel_size=2, stride=2)
-        self.layer1 = self._make_layer(block, 64, layers[0], stride=2)
+        self.prelu = nn.ReLU(inplace=True)
+        self.maxpool = nn.MaxPool2d(kernel_size=2, stride=2)
+        self.layer1 = self._make_layer(block, 64, layers[0], stride=1)
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
         self.layer3 = self._make_layer(block, 256, layers[2], stride=2)
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2)
@@ -182,35 +187,35 @@ class ResNetFace(nn.Module):
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight)
+                nn.init.xavier_uniform_(m.weight)
             elif isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.BatchNorm1d):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
             elif isinstance(m, nn.Linear):
                 nn.init.kaiming_normal_(m.weight)
-                nn.init.constant_(m.bias, 0)
 
         for m in self.modules():
             if isinstance(m, IRBlock):
-                nn.init.kaiming_normal_(m.conv2.weight)
-                if m.conv2.bias is not None:
-                    nn.init.constant_(m.conv2.bias, 0)
+                pass#nn.init.constant_(m.conv2.weight, 0)
 
 
     def _make_layer(self, block, planes, blocks, stride=1):
         downsample = None
         if stride != 1 or self.inplanes != planes * block.expansion:
             downsample = nn.Sequential(
-                nn.BatchNorm2d(self.inplanes),
                 nn.Conv2d(self.inplanes, planes * block.expansion,
-                          kernel_size=1, stride=1, bias=False),
-                nn.AvgPool2d(3, 2, 1),
+                          kernel_size=1, stride=1, bias=True),
+                nn.MaxPool2d(3, 2, 1),
             )
         layers = []
-        layers.append(block(self.inplanes, planes, stride, downsample, use_se=self.use_se))
         self.inplanes = planes
+        layers.append(block(self.inplanes, planes, stride, downsample, use_se=self.use_se))
+        #layers[-1].mul = self.base*(1+self.base) ** self.L
+        self.L += 1
         for i in range(1, blocks):
             layers.append(block(self.inplanes, planes, use_se=self.use_se))
+            #layers[-1].mul = self.base*(1+self.base) ** self.L
+            self.L += 1
 
         return nn.Sequential(*layers)
 
@@ -218,7 +223,7 @@ class ResNetFace(nn.Module):
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.prelu(x)
-        #x = self.maxpool(x)
+        x = self.maxpool(x)
 
         x = self.layer1(x)
         x = self.layer2(x)
@@ -226,7 +231,7 @@ class ResNetFace(nn.Module):
         x = self.layer4(x)
         x = self.bn4(x)
         x = self.dropout(x)
-        x = F.adaptive_avg_pool2d(x, 1)
+        x = F.adaptive_max_pool2d(x, 1)
         x = x.view(x.size(0), -1)
         x = self.fc5(x)
         x = self.bn5(x)
@@ -256,7 +261,7 @@ class ResNet(nn.Module):
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode='fan_in', nonlinearity='relu')
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
             elif isinstance(m, nn.BatchNorm2d):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
@@ -266,7 +271,7 @@ class ResNet(nn.Module):
         if stride != 1 or self.inplanes != planes * block.expansion:
             downsample = nn.Sequential(
                 nn.Conv2d(self.inplanes, planes * block.expansion,
-                          kernel_size=1, stride=stride, bias=False),
+                          kernel_size=1, stride=stride, bFalseias=False),
                 nn.BatchNorm2d(planes * block.expansion),
             )
 

@@ -1,5 +1,6 @@
 import os
 import time
+import random
 
 import torch
 from torch.nn import DataParallel
@@ -51,16 +52,24 @@ class LFWUniqueTestSet(torch.utils.data.Dataset):
 
 
 class LFWTester:
-    def __init__(self, root, pairs_file, device, sim_f, batch_size=64):
+    def __init__(self, root, pairs_file, device, sim_f, batch_size=64, viz=None):
         transforms = TF.Compose([
             TF.ToTensor(),
-            TF.Normalize(mean=[0.5] * 3, std=[0.5] * 3, inplace=True)
+            TF.Normalize(mean=[0.5503, 0.4352, 0.3844], std=[0.2724, 0.2396, 0.2317])
+            #TF.Normalize(mean=[0.4] * 3, std=[0.2] * 3)
         ])
         self.dataset = LFWUniqueTestSet(root, pairs_file, transforms)
         self.device = device
         self.batch_size = batch_size
         self.sim_f = sim_f
         self.pairs = LFWTester.read_pairs(pairs_file)
+        self.viz = viz
+
+        self.test_loader = torch.utils.data.DataLoader(
+            self.dataset,
+            pin_memory=True,
+            batch_size=self.batch_size,
+            num_workers=self.batch_size // 8)
 
     @staticmethod
     def read_pairs(pairs_file):
@@ -98,17 +107,24 @@ class LFWTester:
     def test_performance(self, fe_dict):
         sims = []
         labels = []
+        random.shuffle(self.pairs)
         for person1, person2, same in self.pairs:
             fe_1 = fe_dict[person1]
             fe_2 = fe_dict[person2]
             label = int(same)
             sim = self.sim_f(fe_1, fe_2)
+            print(person1, person2, sim, same)
 
             sims.append(sim)
             labels.append(label)
 
+        sims = torch.FloatTensor(sims)
+
+        if self.viz is not None:
+            self.viz.hist(sims, name='lfw sim distribution')
+
         loss = torch.nn.functional.binary_cross_entropy(
-            torch.clamp(torch.FloatTensor(sims) * 0.5 + 0.5, 0, 1),
+            torch.clamp(sims * 0.5 + 0.5, 0, 1),
             torch.FloatTensor(labels))
         acc, th = LFWTester.cal_accuracy(sims, labels)
         return acc, th, loss
@@ -116,14 +132,8 @@ class LFWTester:
     def get_features(self, model):
         features = {}
         cnt = 0
-        test_loader = torch.utils.data.DataLoader(
-            self.dataset,
-            pin_memory=True,
-            batch_size=self.batch_size,
-            num_workers=self.batch_size // 16)
-
         with torch.no_grad():
-            for imgs, paths in test_loader:
+            for imgs, paths in self.test_loader:
                 data = imgs.to(self.device)
                 output = model(data)
                 output = output.data.cpu().numpy()

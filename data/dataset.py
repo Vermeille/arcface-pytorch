@@ -31,18 +31,38 @@ class WithProb:
             return self.tfs(x)
         return x
 
+    def __repr__(self):
+        return "WithProp(p={}, {})".format(self.p, repr(self.tfs))
+
+
+class SubsampleResize:
+    def __init__(self, out_size, p=0.05, max_ratio=4):
+        self.max_ratio = max_ratio
+        self.p = p
+        self.out_size = out_size
+
+    def __call__(self, x):
+        down = WithProb(
+            self.p,
+            T.Resize(int(self.out_size // random.uniform(1, self.max_ratio))))
+        up = T.Resize(self.out_size)
+        return up(down(x))
+
+    def __repr__(self):
+        return "SubsampleResize(out_size={}, p={}, max_ratio={})".format(
+            self.out_size, self.p, self.max_ratio)
+
 
 def images(location, img_size):
-    resize = T.Resize(img_size) if img_size is not None else (lambda x: x)
     return torchvision.datasets.ImageFolder(location,
                                             transform=T.Compose([
-                                                resize,
+                                                SubsampleResize(img_size + 5),
+                                                T.RandomCrop(img_size),
                                                 T.RandomHorizontalFlip(),
                                                 WithProb(0.05, T.Grayscale(3)),
                                                 T.ToTensor(),
-                                                T.Normalize(
-                                                    mean=[0.5, 0.5, 0.5],
-                                                    std=[0.5, 0.5, 0.5])
+                        #T.Normalize(mean=[ 0.0920, -0.1608, -0.2804], std=[0.5503, 0.4762, 0.4584])
+                T.Normalize(mean=[0.5503, 0.4352, 0.3844], std=[0.2724, 0.2396, 0.2317])
                                             ]))
 
 
@@ -50,12 +70,13 @@ def imdb_face(root, img_size):
     return IMDBFace(root,
                     transforms=T.Compose([
                         T.RandomRotation(5, expand=False),
-                        T.Resize(img_size + 5),
+                        SubsampleResize(img_size + 5),
                         T.RandomCrop(img_size),
                         T.RandomHorizontalFlip(),
                         WithProb(0.05, T.Grayscale(3)),
                         T.ToTensor(),
-                        T.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
+                        #T.Normalize(mean=[ 0.0920, -0.1608, -0.2804], std=[0.5503, 0.4762, 0.4584])
+            T.Normalize(mean=[0.5503, 0.4352, 0.3844], std=[0.2724, 0.2396, 0.2317])
                     ]))
 
 
@@ -71,5 +92,3 @@ def get_dataset(name, location, size):
     if name == 'images':
         return images(location, size)
     assert False, name + " is not a valid dataset"
-
-

@@ -74,14 +74,13 @@ class Checkpointer:
         self.name = session_name
         self.options = options
 
-    def save(self, iter_n, **more_stuff_to_save):
+    def save(self, iter_n, more_stuff_to_save):
         new_dict = copy.deepcopy(self.options)
         new_dict['model']['state_dict'] = self.model.state_dict()
         new_dict['optimizer']['state_dict'] = self.optimizer.state_dict()
         new_dict['metric']['state_dict'] = self.metric.state_dict()
 
-        for k, v in more_stuff_to_save:
+        for k, v in more_stuff_to_save.items():
             override_with_path(new_dict, k, v)
         new_dict['trainer']['iter_n'] = iter_n
-        torch.save(new_dict, "ckpt/{}_{}.pth".format(self.name, self.name,
-                                                   iter_n))
+        torch.save(new_dict, "ckpt/{}_{}.pth".format(self.name, iter_n))

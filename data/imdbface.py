@@ -61,7 +61,7 @@ class IMDBFace(data.Dataset):
             data, label = self.read_throw(index)
             return data, label
         except Exception as e:
-            print(str(e))
+            print('ERROR for image ' + str(index) + ' '+ str(e))
             return self.__getitem__(index + 1)
 
     def __len__(self):
