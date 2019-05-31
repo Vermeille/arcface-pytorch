@@ -153,7 +153,7 @@ if __name__ == '__main__':
             inspector.analyze(data_input_cpu, cosine, label_cpu, output_label)
 
             #ortho_loss = ortho(metric_fc.weight[label, :], 0.001)
-            ortho_loss = ortho(feature, 1e-5)
+            ortho_loss = ortho(feature, 1e-3)
             loss = clf_loss + ortho_loss
             loss.backward()
 
@@ -178,7 +178,8 @@ if __name__ == '__main__':
                 if trainopts['display']:
                     visualizer.display_current_results(iters,
                                                        ortho_loss.item(),
-                                                       name='ortho_loss')
+                                                       name='ortho_loss',
+                                                       smooth=0)
                     visualizer.display_current_results(iters,
                                                        clf_loss.item(),
                                                        name='train_loss')

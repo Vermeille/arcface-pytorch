@@ -39,6 +39,9 @@ class NoSched:
     def step(self, *unused):
         pass
 
+    def __repr__(self):
+        return "NoScheduler()"
+
 def get_scheduler(optimizer, args, last_epoch=-1):
     args = copy.deepcopy(args)
     name = args.pop('name')
