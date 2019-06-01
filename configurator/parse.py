@@ -59,7 +59,7 @@ def from_cmdline():
     for arg in cmdargs.X:
         k, v = arg.split('=')
         try:
-            ast.literal_eval(v)
+            v = ast.literal_eval(v)
         except:
             pass
         override_with_path(opts, k, v)

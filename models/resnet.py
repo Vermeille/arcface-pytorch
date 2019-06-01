@@ -169,8 +169,8 @@ class ResNetFace(nn.Module):
     def __init__(self, block, layers, use_se=True):
         super(ResNetFace, self).__init__()
         self.inplanes = 64
-        self.L = 1
-        self.base = 0.1
+        self.L = 0
+        self.base = 0.08
         self.use_se = use_se
         self.conv1 = nn.Conv2d(3, 64, kernel_size=3, padding=1, bias=True)
         self.bn1 = nn.BatchNorm2d(64)
@@ -180,10 +180,10 @@ class ResNetFace(nn.Module):
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
         self.layer3 = self._make_layer(block, 256, layers[2], stride=2)
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2)
-        self.bn4 = nn.BatchNorm2d(512)
-        self.dropout = nn.Dropout()
+        #self.bn4 = nn.BatchNorm2d(512)
+        #self.dropout = nn.Dropout()
         self.fc5 = nn.Linear(512, 512)
-        self.bn5 = nn.BatchNorm1d(512)
+        #self.bn5 = nn.BatchNorm1d(512)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -210,11 +210,11 @@ class ResNetFace(nn.Module):
         layers = []
         self.inplanes = planes
         layers.append(block(self.inplanes, planes, stride, downsample, use_se=self.use_se))
-        #layers[-1].mul = self.base*(1+self.base) ** self.L
+        layers[-1].mul = math.sqrt(self.base*(1+self.base) ** self.L)
         self.L += 1
         for i in range(1, blocks):
             layers.append(block(self.inplanes, planes, use_se=self.use_se))
-            #layers[-1].mul = self.base*(1+self.base) ** self.L
+            layers[-1].mul = math.sqrt(self.base*(1+self.base) ** self.L)
             self.L += 1
 
         return nn.Sequential(*layers)
@@ -229,12 +229,12 @@ class ResNetFace(nn.Module):
         x = self.layer2(x)
         x = self.layer3(x)
         x = self.layer4(x)
-        x = self.bn4(x)
-        x = self.dropout(x)
+        #x = self.bn4(x)
+        #x = self.dropout(x)
         x = F.adaptive_max_pool2d(x, 1)
         x = x.view(x.size(0), -1)
         x = self.fc5(x)
-        x = self.bn5(x)
+        #x = self.bn5(x)
 
         return x
 

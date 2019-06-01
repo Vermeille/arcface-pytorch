@@ -61,8 +61,7 @@ def images(location, img_size):
                                                 T.RandomHorizontalFlip(),
                                                 WithProb(0.05, T.Grayscale(3)),
                                                 T.ToTensor(),
-                        #T.Normalize(mean=[ 0.0920, -0.1608, -0.2804], std=[0.5503, 0.4762, 0.4584])
-                T.Normalize(mean=[0.5503, 0.4352, 0.3844], std=[0.2724, 0.2396, 0.2317])
+                                                T.Normalize(mean=[0.5503, 0.4352, 0.3844], std=[0.2724, 0.2396, 0.2317])
                                             ]))
 
 
@@ -75,8 +74,7 @@ def imdb_face(root, img_size):
                         T.RandomHorizontalFlip(),
                         WithProb(0.05, T.Grayscale(3)),
                         T.ToTensor(),
-                        #T.Normalize(mean=[ 0.0920, -0.1608, -0.2804], std=[0.5503, 0.4762, 0.4584])
-            T.Normalize(mean=[0.5503, 0.4352, 0.3844], std=[0.2724, 0.2396, 0.2317])
+                        T.Normalize(mean=[0.5503, 0.4352, 0.3844], std=[0.2724, 0.2396, 0.2317])
                     ]))
 
 

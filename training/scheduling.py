@@ -7,6 +7,7 @@ import utils.maths
 
 class CurriculumScheduler:
     def __init__(self, optimizer, schedule, last_iter=-1):
+        print(type(schedule), schedule)
         self.optimizer = optimizer
         self.schedule = schedule
         self.last_iter = last_iter

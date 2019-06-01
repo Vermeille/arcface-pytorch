@@ -113,7 +113,6 @@ class LFWTester:
             fe_2 = fe_dict[person2]
             label = int(same)
             sim = self.sim_f(fe_1, fe_2)
-            print(person1, person2, sim, same)
 
             sims.append(sim)
             labels.append(label)
@@ -121,7 +120,10 @@ class LFWTester:
         sims = torch.FloatTensor(sims)
 
         if self.viz is not None:
-            self.viz.hist(sims, name='lfw sim distribution')
+            fs = torch.nn.functional.normalize(torch.FloatTensor(list(fe_dict.values())).to(self.device), dim=1)
+            self.viz.hist(torch.mm(fs, fs.t()).view(-1), name='lfw sim distribution')
+            self.viz.hist(torch.FloatTensor(list(fe_dict.values())).view(-1),
+                    name='lfw features distribution')
 
         loss = torch.nn.functional.binary_cross_entropy(
             torch.clamp(sims * 0.5 + 0.5, 0, 1),

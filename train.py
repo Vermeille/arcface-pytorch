@@ -22,9 +22,13 @@ from test import get_tester
 import models.loader as loader
 import training.scheduling as scheduling
 
-def ortho(w, strength=1e-4):
+def ortho_l2(w, strength=1e-4):
     return strength * (torch.mm(w, w.t()) * (1 - torch.eye(w.shape[0],
-        device=w.device))).pow(2).mean()
+        device=w.device))).pow(2).sum(dim=1).mean()
+
+def ortho(w, strength=1e-3):
+    return strength * (torch.mm(w, w.t()) * (1 - torch.eye(w.shape[0],
+        device=w.device))).abs().sum(dim=1).mean()
 
 class Inspector:
     def __init__(self, topk, labels, center_value=0):
@@ -115,6 +119,10 @@ if __name__ == '__main__':
 
     metric_fc = loader.get_metric(num_classes, opt['metric'])
 
+    model.to(device)
+    metric_fc.to(device)
+
+
     optimizer = loader.get_optimizer(
         itertools.chain(model.parameters(), metric_fc.parameters()),
         opt['optimizer'])
@@ -124,9 +132,6 @@ if __name__ == '__main__':
 
     ckpt = configurator.Checkpointer(model, metric_fc, optimizer,
                                      opt['session_name'], opt)
-    model.to(device)
-    metric_fc.to(device)
-
     trainloader = data.DataLoader(train_dataset,
                                   pin_memory=True,
                                   batch_size=trainopts['batch_size'],
@@ -146,6 +151,7 @@ if __name__ == '__main__':
             label = label_cpu.to(device, non_blocking=True).long()
 
             feature = model(data_input)
+            feature_norm = torch.nn.functional.normalize(feature, dim=1)
             output, cosine = metric_fc(feature, label)
             cosine = cosine.detach().to('cpu', non_blocking=True)
             clf_loss = criterion(output, label)
@@ -153,7 +159,9 @@ if __name__ == '__main__':
             inspector.analyze(data_input_cpu, cosine, label_cpu, output_label)
 
             #ortho_loss = ortho(metric_fc.weight[label, :], 0.001)
-            ortho_loss = ortho(feature, 1e-3)
+            if trainopts.get('ortho_reg', False):
+                ortho_loss = ortho(torch.nn.functional.normalize(feature),
+                        trainopts['ortho_reg'])
             loss = clf_loss + ortho_loss
             loss.backward()
 
@@ -170,7 +178,9 @@ if __name__ == '__main__':
                 optimizer.zero_grad()
 
             if iters % trainopts['print_freq'] == 0:
-                visualizer.hist(feature.std(dim=0).detach().cpu(), 'feature distribution during train')
+                visualizer.hist(feature.view(-1).detach().cpu(), 'feature distribution during train')
+                visualizer.hist(torch.mm(feature_norm,
+                    feature_norm.t()).detach().cpu().view(-1), 'training batch cosine distribution')
                 acc = torch.sum((output_label == label_cpu).int()).item()
                 speed = trainopts['print_freq'] / (time.time() - start)
                 time_str = time.asctime(time.localtime(time.time()))
