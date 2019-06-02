@@ -22,7 +22,7 @@ trainer:
     num_worker: 32
     max_epoch: 50
     save_interval: 2000
-    test_interval: 1000
+    test_interval: 200
     iter_n: 0
     display: True
     print_freq: 10
@@ -56,4 +56,4 @@ scheduler:
     schedule:
         - [0, 0.005, 0.95]
         - [500, 0.005, 0.95]
-        - [15000, 0.1, 0.9]
+        - [15000, 0.5, 0.9]
