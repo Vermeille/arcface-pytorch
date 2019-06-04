@@ -54,6 +54,7 @@ class LFWUniqueTestSet(torch.utils.data.Dataset):
 class LFWTester:
     def __init__(self, root, pairs_file, device, sim_f, batch_size=64, viz=None):
         transforms = TF.Compose([
+            TF.Resize(64),
             TF.ToTensor(),
             TF.Normalize(mean=[0.5503, 0.4352, 0.3844], std=[0.2724, 0.2396, 0.2317])
             #TF.Normalize(mean=[0.4] * 3, std=[0.2] * 3)

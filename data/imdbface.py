@@ -69,8 +69,8 @@ class IMDBFace(data.Dataset):
 
     def __repr__(self):
         return """
-    IMDBFace(
-        num_classes: {}
-        num_samples: {}
-        transforms: {}
-    )""".format(len(self.classes), len(self.imgs), self.transforms)
+IMDBFace(
+    num_classes: {}
+    num_samples: {}
+    transforms: {}
+)""".format(len(self.classes), len(self.imgs), self.transforms)

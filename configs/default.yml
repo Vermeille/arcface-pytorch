@@ -40,10 +40,9 @@ optimizer:
 
 loss:
     name: cross_entropy
-    balance: True
 
 model:
-    name: resnet_face50
+    name: resnet18
     use_se: False
 
 metric:
