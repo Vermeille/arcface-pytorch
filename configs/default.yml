@@ -18,7 +18,7 @@ tester:
     similarity: cosine
 
 trainer:
-    batch_size: 256
+    batch_size: 340
     num_worker: 32
     max_epoch: 50
     save_interval: 2000
@@ -27,9 +27,9 @@ trainer:
     display: True
     print_freq: 10
     num_workers: 32
-    clip_grad: 15
+    clip_grad: 1
     n_accumulations: 1
-    ortho_reg: 0.1
+    ortho_reg: False
 
 optimizer:
     name: SGD
@@ -55,4 +55,4 @@ scheduler:
     schedule:
         - [0, 0.005, 0.95]
         - [500, 0.005, 0.95]
-        - [15000, 0.5, 0.9]
+        - [15000, 2, 0.8]

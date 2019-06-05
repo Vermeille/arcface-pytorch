@@ -22,13 +22,25 @@ from test import get_tester
 import models.loader as loader
 import training.scheduling as scheduling
 
+
 def ortho_l2(w, strength=1e-4):
-    return strength * (torch.mm(w, w.t()) * (1 - torch.eye(w.shape[0],
-        device=w.device))).pow(2).sum(dim=1).mean()
+    return strength * (
+        torch.mm(w, w.t()) *
+        (1 - torch.eye(w.shape[0], device=w.device))).pow(2).sum(dim=1).mean()
+
+
+def ortho_abs(w, strength=1e-3):
+    return strength * (torch.mm(w, w.t()) *
+                       (1 - torch.eye(w.shape[0], device=w.device))).abs().sum(
+                           dim=1).mean()
+
 
 def ortho(w, strength=1e-3):
-    return strength * (torch.mm(w, w.t()) * (1 - torch.eye(w.shape[0],
-        device=w.device))).abs().sum(dim=1).mean()
+    cosine = torch.mm(w, w.t())
+    no_diag = (1 - torch.eye(w.shape[0], device=w.device))
+    return strength * (cosine * no_diag -
+                       0.5).clamp(min=0).pow(2).sum(dim=1).mean()
+
 
 class Inspector:
     def __init__(self, topk, labels, center_value=0):
@@ -70,11 +82,11 @@ class Inspector:
             img -= img.min()
             img /= img.max()
             html.append(
-                    '<div style="padding:3px;width:{}px">{}{}{}{}</div>'.format(
+                '<div style="padding:3px;width:{}px">{}{}{}{}</div>'.format(
                     dat[0][0].shape[2], visualizer.img2html(img),
-                    cos_as_bar(p.item()),
-                    '✓' if correct.item() else '✗',
-                    self.labels[cls.item()].replace('_', ' ').replace('-', ' ')))
+                    cos_as_bar(p.item()), '✓' if correct.item() else '✗',
+                    self.labels[cls.item()].replace('_',
+                                                    ' ').replace('-', ' ')))
         html.append('</div>')
         return ''.join(html)
 
@@ -96,6 +108,7 @@ if __name__ == '__main__':
                                 port=opt['visdom_port'])
         if 'visualizer_data' in opt:
             visualizer.load_state_dict(opt['visualizer_data'])
+
     device = torch.device(opt['device'])
 
     train_dataset = dataset.get_datasets(opt['datasets'])
@@ -107,7 +120,7 @@ if __name__ == '__main__':
         'train_dataset': train_dataset,
         'device': device,
         'count_per_class': count_per_class,
-        'inv_count_per_class': 1.0 / count_per_class.float()
+        'inv_count_per_class': len(train_dataset) / count_per_class.float()
     }
     num_classes = len(train_dataset.classes)
     print(num_classes, 'classes')
@@ -121,7 +134,6 @@ if __name__ == '__main__':
 
     model.to(device)
     metric_fc.to(device)
-
 
     optimizer = loader.get_optimizer(
         itertools.chain(model.parameters(), metric_fc.parameters()),
@@ -158,11 +170,15 @@ if __name__ == '__main__':
             output_label = torch.argmax(cosine, dim=1)
             inspector.analyze(data_input_cpu, cosine, label_cpu, output_label)
 
-            #ortho_loss = ortho(metric_fc.weight[label, :], 0.001)
             if trainopts.get('ortho_reg', False):
-                ortho_loss = ortho(torch.nn.functional.normalize(feature),
-                        trainopts['ortho_reg'])
-            loss = clf_loss + ortho_loss
+                #ortho_loss = ortho(feature_norm, trainopts['ortho_reg'])
+                ortho_loss = ortho(
+                    torch.nn.functional.normalize(metric_fc.weight[label, :]),
+                    trainopts['ortho_reg'])
+                loss = clf_loss + ortho_loss
+            else:
+                loss = clf_loss
+
             loss.backward()
 
             tot_loss += loss.item()
@@ -173,23 +189,31 @@ if __name__ == '__main__':
                         itertools.chain(model.parameters(),
                                         metric_fc.parameters()),
                         trainopts['clip_grad'])
-                    print('param norm:', norm)
+                    print('grad norm:', norm)
                 optimizer.step()
                 optimizer.zero_grad()
 
             if iters % trainopts['print_freq'] == 0:
-                visualizer.hist(feature.view(-1).detach().cpu(), 'feature distribution during train')
-                visualizer.hist(torch.mm(feature_norm,
-                    feature_norm.t()).detach().cpu().view(-1), 'training batch cosine distribution')
+                visualizer.hist(
+                    feature.view(-1).detach().cpu(),
+                    'feature distribution during train')
+                visualizer.hist(
+                    torch.mm(feature_norm,
+                             feature_norm.t()).detach().cpu().view(-1),
+                    'training batch cosine distribution')
                 acc = torch.sum((output_label == label_cpu).int()).item()
                 speed = trainopts['print_freq'] / (time.time() - start)
                 time_str = time.asctime(time.localtime(time.time()))
-                print( '{} train epoch {} iter {} / {}, {} iters/s loss {} acc {}' .format(time_str, i, ii, len(trainloader), speed, loss.item(), acc))
+                print(
+                    '{} train epoch {} iter {} / {}, {} iters/s loss {} acc {}'
+                    .format(time_str, i, ii, len(trainloader), speed,
+                            loss.item(), acc))
                 if trainopts['display']:
-                    visualizer.display_current_results(iters,
-                                                       ortho_loss.item(),
-                                                       name='ortho_loss',
-                                                       smooth=0)
+                    if trainopts.get('ortho_reg', False):
+                        visualizer.display_current_results(iters,
+                                                           ortho_loss.item(),
+                                                           name='ortho_loss',
+                                                           smooth=0)
                     visualizer.display_current_results(iters,
                                                        clf_loss.item(),
                                                        name='train_loss')
