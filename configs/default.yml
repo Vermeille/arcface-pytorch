@@ -18,8 +18,15 @@ testers:
       batch_size: 128
       similarity: cosine
 
+    - type: pairwise
+      name: xv
+      root: holdout
+      pairs_file: ./test_porn_pairs.txt
+      batch_size: 128
+      similarity: cosine
+
 trainer:
-    batch_size: 340
+    batch_size: 256
     num_worker: 32
     max_epoch: 50
     save_interval: 2000

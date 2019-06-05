@@ -18,7 +18,7 @@ class TestRunner:
 
     def __call__(self, model):
         full_out = {}
-        for tag, tester in testers.items():
+        for tag, tester in self.testers.items():
             out = tester(model)
             for k, v in out.items():
                 full_out["{}:{}".format(tag, k)] = v
@@ -30,13 +30,14 @@ def get_tester(device, args):
 
     testers = {}
     for test in args:
-        ty = args.pop('name')
-        tag = args.pop('tag')
+        ty = test.pop('type')
+        tag = test.pop('name')
         if ty == 'pairwise':
-            testers[tag] = PairwiseTester(args['root'], args['pairs_file'],
-                             device,
-                             globals()[args['similarity']],
-                             args.get('batch_size', 64))
+            testers[tag] = PairwiseTester(test['root'], test['pairs_file'],
+                                          device,
+                                          globals()[test['similarity']],
+                                          test.get('batch_size', 64),
+                                          lfw_crop=tag=='lfw')
         else:
             raise Exception(name + ' is not a testset')
     return TestRunner(testers)

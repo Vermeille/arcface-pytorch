@@ -23,25 +23,27 @@ def read_pairs(pair_list):
     return list(data)
 
 
-def load_image(img_path):
+def load_image(img_path, lfw_crop=False):
     image = Image.open(img_path)
     if image is None:
         return None
-    off = 25
-    image = image.crop((92 - off, 83 - off, 175 + off, 166 + off))
+    if lfw_crop:
+        off = 25
+        image = image.crop((92 - off, 83 - off, 175 + off, 166 + off))
     image = image.convert('RGB')
     return image
 
 
 class PairwiseTestSet(torch.utils.data.Dataset):
-    def __init__(self, root, img_list, transforms=None):
+    def __init__(self, root, img_list, transforms=None, lfw_crop=False):
+        self.lfw_crop = lfw_crop
         self.root = root
         self.transforms = transforms
         self.samples = read_pairs(img_list)
 
     def __getitem__(self, i):
         path = self.samples[i]
-        img = load_image(self.root + '/' + path)
+        img = load_image(self.root + '/' + path, lfw_crop=self.lfw_crop)
 
         if self.transforms is not None:
             img = self.transforms(img)
@@ -52,18 +54,28 @@ class PairwiseTestSet(torch.utils.data.Dataset):
 
 
 class PairwiseTester:
-    def __init__(self, root, pairs_file, device, sim_f, batch_size=64, viz=None):
+    def __init__(self,
+                 root,
+                 pairs_file,
+                 device,
+                 sim_f,
+                 batch_size=64,
+                 viz=None,
+                 lfw_crop=False):
         transforms = TF.Compose([
             TF.Resize(64),
             TF.ToTensor(),
-            TF.Normalize(mean=[0.5503, 0.4352, 0.3844], std=[0.2724, 0.2396, 0.2317])
-            #TF.Normalize(mean=[0.4] * 3, std=[0.2] * 3)
+            TF.Normalize(mean=[0.5503, 0.4352, 0.3844],
+                         std=[0.2724, 0.2396, 0.2317])
         ])
-        self.dataset = PairwiseTestSet(root, pairs_file, transforms)
+        self.dataset = PairwiseTestSet(root,
+                                       pairs_file,
+                                       transforms=transforms,
+                                       lfw_crop=lfw_crop)
         self.device = device
         self.batch_size = batch_size
         self.sim_f = sim_f
-        self.pairs = LFWTester.read_pairs(pairs_file)
+        self.pairs = PairwiseTester.read_pairs(pairs_file)
         self.viz = viz
 
         self.test_loader = torch.utils.data.DataLoader(
@@ -121,15 +133,17 @@ class PairwiseTester:
         sims = torch.FloatTensor(sims)
 
         if self.viz is not None:
-            fs = torch.nn.functional.normalize(torch.FloatTensor(list(fe_dict.values())).to(self.device), dim=1)
-            self.viz.hist(torch.mm(fs, fs.t()).view(-1), name='lfw sim distribution')
+            fs = torch.nn.functional.normalize(torch.FloatTensor(
+                list(fe_dict.values())).to(self.device),
+                                               dim=1)
+            self.viz.hist(torch.mm(fs, fs.t()).view(-1),
+                          name='lfw sim distribution')
             self.viz.hist(torch.FloatTensor(list(fe_dict.values())).view(-1),
-                    name='lfw features distribution')
+                          name='lfw features distribution')
 
         loss = torch.nn.functional.binary_cross_entropy(
-            torch.clamp(sims * 0.5 + 0.5, 0, 1),
-            torch.FloatTensor(labels))
-        acc, th = LFWTester.cal_accuracy(sims, labels)
+            torch.clamp(sims * 0.5 + 0.5, 0, 1), torch.FloatTensor(labels))
+        acc, th = PairwiseTester.cal_accuracy(sims, labels)
         return acc, th, loss
 
     def get_features(self, model):

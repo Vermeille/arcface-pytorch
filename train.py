@@ -113,7 +113,7 @@ if __name__ == '__main__':
     train_dataset = dataset.get_datasets(opt['datasets'])
     print(train_dataset)
     count_per_class = dataset.count_per_class(train_dataset).to(device)
-    tester = get_tester(opt['device'], opt['tester'])
+    tester = get_tester(opt['device'], opt['testers'])
     tester.viz = visualizer
     state = {
         'train_dataset': train_dataset,
