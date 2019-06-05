@@ -15,7 +15,6 @@ import numpy as np
 
 import data.dataset as dataset
 import configurator
-from test import *
 from utils import Visualizer, view_model
 from models import *
 from test import get_tester
@@ -114,7 +113,7 @@ if __name__ == '__main__':
     train_dataset = dataset.get_datasets(opt['datasets'])
     print(train_dataset)
     count_per_class = dataset.count_per_class(train_dataset).to(device)
-    tester = get_tester(opt['tester']['name'], opt['device'], opt['tester'])
+    tester = get_tester(opt['device'], opt['tester'])
     tester.viz = visualizer
     state = {
         'train_dataset': train_dataset,
@@ -238,12 +237,9 @@ if __name__ == '__main__':
                 ckpt.save(iters, {'visualizer_data': visualizer.state_dict()})
 
             if iters % trainopts['test_interval'] == 0:
-                acc, test_loss = tester(model)
+                test_res = tester(model)
+                print(test_res)
                 if trainopts['display']:
-                    visualizer.display_current_results(iters,
-                                                       acc,
-                                                       name='test_acc')
-                    visualizer.display_current_results(iters,
-                                                       test_loss,
-                                                       name='test_loss')
+                    for k, v in test_res.items():
+                        visualizer.display_current_results(iters, v, name=k)
             iters += 1

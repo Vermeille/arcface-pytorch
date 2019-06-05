@@ -33,7 +33,7 @@ def load_image(img_path):
     return image
 
 
-class LFWUniqueTestSet(torch.utils.data.Dataset):
+class PairwiseTestSet(torch.utils.data.Dataset):
     def __init__(self, root, img_list, transforms=None):
         self.root = root
         self.transforms = transforms
@@ -51,7 +51,7 @@ class LFWUniqueTestSet(torch.utils.data.Dataset):
         return len(self.samples)
 
 
-class LFWTester:
+class PairwiseTester:
     def __init__(self, root, pairs_file, device, sim_f, batch_size=64, viz=None):
         transforms = TF.Compose([
             TF.Resize(64),
@@ -59,7 +59,7 @@ class LFWTester:
             TF.Normalize(mean=[0.5503, 0.4352, 0.3844], std=[0.2724, 0.2396, 0.2317])
             #TF.Normalize(mean=[0.4] * 3, std=[0.2] * 3)
         ])
-        self.dataset = LFWUniqueTestSet(root, pairs_file, transforms)
+        self.dataset = PairwiseTestSet(root, pairs_file, transforms)
         self.device = device
         self.batch_size = batch_size
         self.sim_f = sim_f
@@ -87,7 +87,7 @@ class LFWTester:
         acc, th, loss = self.test_performance(feats)
         print('lfw face verification accuracy: ', acc, 'threshold: ', th)
         model.train()
-        return acc, loss
+        return {'acc': acc, 'loss': loss, 'thresh': th}
 
     @staticmethod
     def cal_accuracy(y_score, y_true):

@@ -10,12 +10,13 @@ datasets:
       location: ../data/
       size: 64
 
-tester:
-    name: lfw
-    root: ../lfw_funneled/
-    pairs_file: ./lfw_test_pair.txt
-    batch_size: 128
-    similarity: cosine
+testers:
+    - type: pairwise
+      name: lfw
+      root: ../lfw_funneled/
+      pairs_file: ./lfw_test_pair.txt
+      batch_size: 128
+      similarity: cosine
 
 trainer:
     batch_size: 340
@@ -27,7 +28,7 @@ trainer:
     display: True
     print_freq: 10
     num_workers: 32
-    clip_grad: 1
+    clip_grad: 100
     n_accumulations: 1
     ortho_reg: False
 
@@ -36,10 +37,11 @@ optimizer:
     lr: 0.005
     weight_decay: 1.e-6
     momentum: 0.95
-    nesterov: True
+    nesterov: False
 
 loss:
     name: cross_entropy
+    balance: True
 
 model:
     name: resnet18
@@ -52,7 +54,12 @@ metric:
 
 scheduler:
     name: CurriculumScheduler
-    schedule:
-        - [0, 0.005, 0.95]
-        - [500, 0.005, 0.95]
-        - [15000, 2, 0.8]
+    schedule':
+        - [0, 0.02, 0.3]
+        - [500, 0.02, 0.3]
+        - [15000, 1, 0.9]
+        - [56000, 1, 0.9]
+        - [75000, 0.02, 0.95]
+        - [80000, 0.02, 0.95]
+        - [120000, 0.0001, 0.99]
+
