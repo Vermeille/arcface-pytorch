@@ -1,10 +1,14 @@
-from __future__ import print_function
-from __future__ import division
+import math
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn import Parameter
-import math
+
+
+def FixedAdaCos(dim, num_classes):
+    s = math.sqrt(2) * math.log(num_classes - 1)
+    return ArcMarginProduct(dim, num_classes, s=s, m=0)
 
 
 class ArcMarginProduct(nn.Module):
