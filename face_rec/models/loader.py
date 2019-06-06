@@ -4,7 +4,7 @@ import torch
 
 from .resnet import *
 from .focal_loss import FocalLoss
-import models.metrics as metrics
+import face_rec.models.metrics as metrics
 
 
 def get_model(args):

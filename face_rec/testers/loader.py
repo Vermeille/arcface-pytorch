@@ -1,57 +1,20 @@
-import os
-import time
 import random
-
-import torch
-from torch.nn import DataParallel
-import torchvision
-import torchvision.transforms as TF
-
+import time
+import copy
 import numpy as np
 
-from PIL import Image
+import torch
+import torchvision.transforms as TF
+
+from face_rec.data.pairwise import PairwiseDataset
 
 
-def read_pairs(pair_list):
-    with open(pair_list, 'r') as fd:
-        lines = fd.readlines()
-    data = set()
-    for line in lines:
-        p1, p2, same = line.split()
-        data.add(p1)
-        data.add(p2)
-    return list(data)
+def euclidean(x1, x2):
+    return np.linalg.norm(x1 - x2)
 
 
-def load_image(img_path, lfw_crop=False):
-    image = Image.open(img_path)
-    if image is None:
-        return None
-    if lfw_crop:
-        off = 25
-        image = image.crop((92 - off, 83 - off, 175 + off, 166 + off))
-    image = image.convert('RGB')
-    return image
-
-
-class PairwiseTestSet(torch.utils.data.Dataset):
-    def __init__(self, root, img_list, transforms=None, lfw_crop=False):
-        self.lfw_crop = lfw_crop
-        self.root = root
-        self.transforms = transforms
-        self.samples = read_pairs(img_list)
-
-    def __getitem__(self, i):
-        path = self.samples[i]
-        img = load_image(self.root + '/' + path, lfw_crop=self.lfw_crop)
-
-        if self.transforms is not None:
-            img = self.transforms(img)
-        return img, path
-
-    def __len__(self):
-        return len(self.samples)
-
+def cosine(x1, x2):
+    return np.dot(x1, x2) / (np.linalg.norm(x1) * np.linalg.norm(x2))
 
 class PairwiseTester:
     def __init__(self,
@@ -68,7 +31,7 @@ class PairwiseTester:
             TF.Normalize(mean=[0.5503, 0.4352, 0.3844],
                          std=[0.2724, 0.2396, 0.2317])
         ])
-        self.dataset = PairwiseTestSet(root,
+        self.dataset = PairwiseDataset(root,
                                        pairs_file,
                                        transforms=transforms,
                                        lfw_crop=lfw_crop)
@@ -160,3 +123,33 @@ class PairwiseTester:
             cnt += 1
 
         return features, cnt
+
+class TestRunner:
+    def __init__(self, testers):
+        self.testers = testers
+
+    def __call__(self, model):
+        full_out = {}
+        for tag, tester in self.testers.items():
+            out = tester(model)
+            for k, v in out.items():
+                full_out["{}:{}".format(tag, k)] = v
+        return full_out
+
+
+def get_tester(device, args):
+    args = copy.deepcopy(args)
+
+    testers = {}
+    for test in args:
+        ty = test.pop('type')
+        tag = test.pop('name')
+        if ty == 'pairwise':
+            testers[tag] = PairwiseTester(test['root'], test['pairs_file'],
+                                          device,
+                                          globals()[test['similarity']],
+                                          test.get('batch_size', 64),
+                                          lfw_crop=tag=='lfw')
+        else:
+            raise Exception(name + ' is not a testset')
+    return TestRunner(testers)

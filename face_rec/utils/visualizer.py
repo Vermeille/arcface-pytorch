@@ -72,7 +72,8 @@ class Visualizer(object):
             # win='roc',
             opts=dict(legend=['roc'], title='roc'))
 
-    def img2html(self, img, opts=None):
+    @staticmethod
+    def img2html(img, opts=None):
         if isinstance(img, torch.Tensor):
             img = img.cpu().detach().numpy()
 

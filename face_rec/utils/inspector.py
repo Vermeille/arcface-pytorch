@@ -1,3 +1,5 @@
+from face_rec.utils.visualizer import Visualizer
+
 class Inspector:
     def __init__(self, topk, labels, center_value=0):
         self.labels = labels
@@ -39,7 +41,7 @@ class Inspector:
             img /= img.max()
             html.append(
                 '<div style="padding:3px;width:{}px">{}{}{}{}</div>'.format(
-                    dat[0][0].shape[2], visualizer.img2html(img),
+                    dat[0][0].shape[2], Visualizer.img2html(img),
                     cos_as_bar(p.item()), '✓' if correct.item() else '✗',
                     self.labels[cls.item()].replace('_',
                                                     ' ').replace('-', ' ')))

@@ -38,7 +38,7 @@ def override_dict(d1, d2):
 
 
 def load_default():
-    basedir = Path(__file__).resolve().parent.parent
+    basedir = Path(__file__).resolve().parent.parent.parent
     default = basedir / 'configs/default.yml'
     return parse(str(default))
 

@@ -13,14 +13,14 @@ from torch.nn import DataParallel
 
 import numpy as np
 
-import data.dataset as dataset
-import configurator
-from utils import Visualizer, view_model
-from models import *
-from test import get_tester
-import models.loader as loader
-import training.scheduling as scheduling
-from utils import Inspector
+import face_rec.data.dataset as dataset
+import face_rec.configurator as configurator
+from face_rec.utils import Visualizer, view_model
+from face_rec.models import *
+from face_rec.testers.loader import get_tester
+import face_rec.models.loader as loader
+import face_rec.training.scheduling as scheduling
+from face_rec.utils.inspector import Inspector
 
 
 def ortho_l2(w, strength=1e-4):

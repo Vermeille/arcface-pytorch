@@ -2,7 +2,7 @@ import copy
 
 from torch.optim.lr_scheduler import *
 
-import utils.maths
+import face_rec.utils.maths as mathutils
 
 
 class CurriculumScheduler:
@@ -21,9 +21,9 @@ class CurriculumScheduler:
             lim_hi, lr_hi, mom_hi = hi
 
             if limit_lo <= self.last_iter < lim_hi:
-                t = utils.maths.get_t(limit_lo, lim_hi, self.last_iter)
-                the_lr = utils.maths.lerp(lr_lo, lr_hi, t)
-                the_mom = utils.maths.lerp(mom_lo, mom_hi, t)
+                t = mathutils.get_t(limit_lo, lim_hi, self.last_iter)
+                the_lr = mathutils.lerp(lr_lo, lr_hi, t)
+                the_mom = mathutils.lerp(mom_lo, mom_hi, t)
 
         for group in self.optimizer.param_groups:
             group['lr'] = the_lr
