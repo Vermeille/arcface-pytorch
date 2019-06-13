@@ -78,9 +78,6 @@ class Visualizer(object):
             img = img.cpu().detach().numpy()
 
         opts = {} if opts is None else opts
-        opts['width'] = opts.get('width', img.shape[img.ndim - 1])
-        opts['height'] = opts.get('height', img.shape[img.ndim - 2])
-
         if isinstance(img, np.ndarray):
             nchannels = img.shape[0] if img.ndim == 3 else 1
             if nchannels == 1:
@@ -94,6 +91,10 @@ class Visualizer(object):
 
             img = np.transpose(img, (1, 2, 0))
             img = Image.fromarray(img)
+
+        opts['width'] = opts.get('width', img.width)
+        opts['height'] = opts.get('height', img.height)
+
         buf = BytesIO()
         image_type = 'png'
         imsave_args = {}

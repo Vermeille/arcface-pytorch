@@ -39,7 +39,7 @@ for i in range(to_gen):
     klass = random.choice(classes)
     line = (random.choice(per_class[klass]), random.choice(per_class[klass]), '1')
     line_rev = (line[1], line[0], line[2])
-    while line in pairs or line_rev in pairs:
+    while line in pairs or line_rev in pairs or line[1] == line[0]:
         klass = random.choice(classes)
         line = (random.choice(per_class[klass]),
                 random.choice(per_class[klass]), '1')
@@ -53,7 +53,7 @@ for i in range(to_gen):
     klass2 = random.choice(classes)
     line = (random.choice(per_class[klass1]), random.choice(per_class[klass2]), '0')
     line_rev = (line[1], line[0], line[2])
-    while line in diff or line_rev in diff:
+    while line in diff or line_rev in diff or klass1 == klass2:
         klass1 = random.choice(classes)
         klass2 = random.choice(classes)
         line = (random.choice(per_class[klass1]), random.choice(per_class[klass2]), '0')

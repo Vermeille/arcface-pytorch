@@ -20,7 +20,7 @@ from face_rec.models import *
 from face_rec.testers.loader import get_tester
 import face_rec.models.loader as loader
 import face_rec.training.scheduling as scheduling
-from face_rec.utils.inspector import Inspector
+from face_rec.utils.inspector import ClassificationInspector
 
 
 def ortho_l2(w, strength=1e-4):
@@ -94,7 +94,7 @@ if __name__ == '__main__':
                                   shuffle=True,
                                   num_workers=trainopts['num_workers'])
 
-    inspector = Inspector(16, train_dataset.classes)
+    inspector = ClassificationInspector(16, train_dataset.classes)
     iters = trainopts.get('iter_n', 0)
     start = time.time()
     for i in range(trainopts.get('start_epoch', 0), trainopts['max_epoch']):
@@ -183,6 +183,7 @@ if __name__ == '__main__':
 
             if iters % trainopts['test_interval'] == 0:
                 test_res = tester(model)
+                tester.show(visualizer)
                 print(test_res)
                 if trainopts['display']:
                     for k, v in test_res.items():

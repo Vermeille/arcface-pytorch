@@ -41,9 +41,12 @@ class PairwiseDataset(torch.utils.data.Dataset):
         self.transforms = transforms
         self.samples = read_pairs(img_list)
 
+    def from_path(self, path):
+        return load_image(self.root + '/' + path, lfw_crop=self.lfw_crop)
+
     def __getitem__(self, i):
         path = self.samples[i]
-        img = load_image(self.root + '/' + path, lfw_crop=self.lfw_crop)
+        img = self.from_path(path)
 
         if self.transforms is not None:
             img = self.transforms(img)

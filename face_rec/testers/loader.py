@@ -7,6 +7,7 @@ import torch
 import torchvision.transforms as TF
 
 from face_rec.data.pairwise import PairwiseDataset
+from face_rec.utils.inspector import ComparisonInspector
 
 
 def euclidean(x1, x2):
@@ -39,6 +40,7 @@ class PairwiseTester:
         self.batch_size = batch_size
         self.sim_f = sim_f
         self.pairs = PairwiseTester.read_pairs(pairs_file)
+        self.inspector = ComparisonInspector(32, self.dataset, self.pairs)
         self.viz = viz
 
         self.test_loader = torch.utils.data.DataLoader(
@@ -94,6 +96,7 @@ class PairwiseTester:
             labels.append(label)
 
         sims = torch.FloatTensor(sims)
+        labels = torch.FloatTensor(labels)
 
         if self.viz is not None:
             fs = torch.nn.functional.normalize(torch.FloatTensor(
@@ -105,8 +108,10 @@ class PairwiseTester:
                           name='lfw features distribution')
 
         loss = torch.nn.functional.binary_cross_entropy(
-            torch.clamp(sims * 0.5 + 0.5, 0, 1), torch.FloatTensor(labels))
+            torch.clamp(sims * 0.5 + 0.5, 0, 1), labels)
         acc, th = PairwiseTester.cal_accuracy(sims, labels)
+        self.inspector.center_value = th
+        self.inspector.analyze(sims, labels)
         return acc, th, loss
 
     def get_features(self, model):
@@ -135,6 +140,10 @@ class TestRunner:
             for k, v in out.items():
                 full_out["{}:{}".format(tag, k)] = v
         return full_out
+
+    def show(self, viz):
+        for tag, tester in self.testers.items():
+            tester.inspector.show(viz, tag)
 
 
 def get_tester(device, args):
