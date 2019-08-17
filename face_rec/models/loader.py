@@ -6,6 +6,8 @@ from .resnet import *
 from .focal_loss import FocalLoss
 import face_rec.models.metrics as metrics
 
+from torchelie.loss import FocalLoss
+
 
 def get_model(args):
     args = copy.deepcopy(args)

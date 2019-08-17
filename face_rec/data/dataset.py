@@ -6,9 +6,10 @@ import torch
 import torchvision
 from torchvision import transforms as T
 
+from torchelie.datasets import HorizontalConcatDataset
+
 from PIL import Image
 
-from .concat import DatasetConcat
 from .imdbface import IMDBFace
 
 
@@ -81,7 +82,7 @@ def imdb_face(root, img_size):
 def get_datasets(specs):
     if len(specs) == 1:
         return get_dataset(**specs[0])
-    return DatasetConcat([get_dataset(**spec) for spec in specs])
+    return HorizontalDatasetConcat([get_dataset(**spec) for spec in specs])
 
 
 def get_dataset(name, location, size):
