@@ -55,3 +55,30 @@ class PairwiseDataset(torch.utils.data.Dataset):
     def __len__(self):
         return len(self.samples)
 
+
+class IdentificationDataset(torch.utils.data.Dataset):
+    def __init__(self, root, img_list, transforms=None, lfw_crop=False):
+        self.lfw_crop = lfw_crop
+        self.root = root
+        self.transforms = transforms
+        self.samples = IdentificationDataset.read_file(img_list)
+
+    @staticmethod
+    def read_file(path):
+        with open(path, 'r') as f:
+            return [l for l in f if l != 'REF' and l != 'TEST']
+
+    def from_path(self, path):
+        return load_image(self.root + '/' + path, lfw_crop=self.lfw_crop)
+
+    def __getitem__(self, i):
+        path = self.samples[i]
+        img = self.from_path(path)
+
+        if self.transforms is not None:
+            img = self.transforms(img)
+        return img, path
+
+    def __len__(self):
+        return len(self.samples)
+
