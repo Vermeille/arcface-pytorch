@@ -1,8 +1,8 @@
-from distutils.core import setup
+from setuptools import setup, find_packages
 
 setup(
-        name='arface-pytorch',
+        name='arcface-pytorch',
         version='0.1dev',
-        packages=['face_rec',],
+        packages=find_packages(),
         license='Creative Commons Attribution-Noncommercial-Share Alike license',
 )
